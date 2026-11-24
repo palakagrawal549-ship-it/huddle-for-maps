@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Huddle for Maps</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one chat panel floating on a full map. Nothing else competes for attention. */
+:root{
+  --bg:#eceff3; --surface:#ffffff; --ink:#18202d; --muted:#667085; --line:#e4e7ec; --soft:#f3f5f8;
+  --land:#eef0ec; --road:#ffffff; --park:#d2e7cb; --water:#c3d8ee;
+  --brand:#2f6be4; --brand-soft:#e7efff; --parade:#e89a00; --parade-soft:#fff1d4; --crit:#d23b2f;
+  --you:#2f6be4; --riya:#d1457f; --sam:#178a58; --dev:#8357d6;
+  --shadow:0 10px 30px rgba(20,30,50,.14),0 2px 6px rgba(20,30,50,.08);
+  --f-brand:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1118; --surface:#1a202b; --ink:#e9edf3; --muted:#9aa4b5; --line:#2a3242; --soft:#232a37;
+  --land:#1b2029; --road:#2c3442; --park:#1f3426; --water:#152739;
+  --brand:#6f9cff; --brand-soft:#1d2b48; --parade:#f5b13a; --parade-soft:#3a2d12; --crit:#f07164;
+  --you:#6f9cff; --riya:#f07aa8; --sam:#4cc98e; --dev:#a988f0;
+  --shadow:0 10px 30px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1118; --surface:#1a202b; --ink:#e9edf3; --muted:#9aa4b5; --line:#2a3242; --soft:#232a37;
+  --land:#1b2029; --road:#2c3442; --park:#1f3426; --water:#152739;
+  --brand:#6f9cff; --brand-soft:#1d2b48; --parade:#f5b13a; --parade-soft:#3a2d12; --crit:#f07164;
+  --you:#6f9cff; --riya:#f07aa8; --sam:#4cc98e; --dev:#a988f0;
+  --shadow:0 10px 30px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.35); color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 40px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px}
+.top h1{font-family:var(--f-brand);font-weight:800;font-size:clamp(26px,3.6vw,36px);letter-spacing:-.015em}
+.top p{color:var(--muted);max-width:62ch}
+
+.app{position:relative;height:min(820px,88vh);min-height:620px;border-radius:20px;overflow:hidden;background:var(--land);border:1px solid var(--line)}
+.mapbox{position:absolute;inset:0}
+svg.map{position:absolute;inset:0;width:100%;height:100%}
+.layer{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:999px;box-shadow:var(--shadow);padding:6px 6px 6px 14px;font-weight:600;font-size:13px}
+.switch{position:relative;width:42px;height:24px;border-radius:999px;border:0;background:var(--line);flex:none;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.switch[aria-checked="true"]{background:var(--parade)}
+.switch[aria-checked="true"]::after{transform:translateX(18px)}
+.layer .dotp{width:10px;height:10px;border-radius:50%;background:var(--parade)}
+
+/* chat */
+.chat{position:absolute;top:14px;left:14px;bottom:14px;width:400px;background:var(--surface);border-radius:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.chat-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.faces{display:flex}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:2px solid var(--surface);flex:none}
+.faces .av+.av{margin-left:-9px}
+.chat-head b{display:block;font-size:15px}
+.chat-head span{font-size:12px;color:var(--muted)}
+.msgs{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:10px}
+.m{display:flex;gap:8px;align-items:flex-end;max-width:92%}
+.m .av{width:26px;height:26px;font-size:11px;border:0}
+.m .body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.m .who{font-size:11px;color:var(--muted);font-weight:600;padding-left:4px}
+.bubble{background:var(--soft);padding:8px 12px;border-radius:16px 16px 16px 4px;font-size:13.5px}
+.m.me{align-self:flex-end;flex-direction:row-reverse}
+.m.me .bubble{background:var(--brand);color:#fff;border-radius:16px 16px 4px 16px}
+.m.me .who{display:none}
+.m.bot{max-width:100%;width:100%}
+.m.bot .bubble{background:var(--brand-soft);border-radius:16px 16px 16px 4px}
+.botav{background:var(--ink)}
+.botav svg{width:14px;height:14px}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.opt{all:unset;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.opt[aria-pressed="true"]{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.opt:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.opt .r1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.opt .nm{font-weight:700;font-size:14px}
+.opt .tag{font-size:11px;font-weight:700;color:var(--brand)}
+.opt .sub{font-size:12px;color:var(--muted)}
+.times{display:flex;flex-wrap:wrap;gap:5px}
+.time{display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;background:var(--soft);border-radius:999px;padding:2px 8px 2px 3px;font-variant-numeric:tabular-nums}
+.time i{width:14px;height:14px;border-radius:50%;flex:none}
+.warn{font-size:12px;color:var(--crit)}
+.parade-note{font-size:12px;color:var(--ink);background:var(--parade-soft);border-radius:8px;padding:6px 8px;margin-top:6px}
+.vote{align-self:flex-start;margin-top:2px;background:var(--brand);color:#fff;border:0;border-radius:999px;padding:6px 14px;font-weight:700;font-size:12.5px}
+.dirs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.dirs a{font-size:12px;font-weight:600;text-decoration:none;border-radius:999px;padding:4px 10px;background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.composer{border-top:1px solid var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.quick{display:flex;gap:6px;overflow-x:auto}
+.quick button{white-space:nowrap;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600}
+.row{display:flex;gap:8px}
+.row input{flex:1;min-width:0;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:999px;padding:9px 14px}
+.send{border:0;background:var(--brand);color:#fff;border-radius:50%;width:38px;height:38px;display:grid;place-items:center;flex:none}
+.send svg{width:16px;height:16px}
+@media (max-width:820px){
+  .app{height:auto;min-height:0;display:flex;flex-direction:column;gap:12px;background:transparent;border:0;overflow:visible}
+  .mapbox{position:relative;height:420px;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--land)}
+  .chat{position:static;width:auto;height:640px}
+}
+
+/* below */
+.how{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.how{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.how{grid-template-columns:minmax(0,1fr)}}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.step b{font-family:var(--f-brand);font-size:15px}
+.step span{color:var(--muted)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+summary{font-weight:700;cursor:pointer}
+details pre{margin:10px 0 0;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--soft);border-radius:10px;padding:12px;overflow:auto;white-space:pre-wrap;max-height:360px;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Huddle for Maps</h1>
+      <p>Plan with friends in a chat that sits on top of Google Maps. Everyone says where they are and what they want; Huddle suggests places that are fair for everyone and knows about today's parade closures.</p>
+    </div>
+  </header>
+
+  <section class="app">
+    <div class="mapbox">
+      <svg class="map" id="map" viewBox="20 120 600 660" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map showing each friend, the suggested places, and the parade route"></svg>
+      <div class="layer"><span class="dotp" aria-hidden="true"></span><span>Parade traffic</span><button class="switch" id="parade" role="switch" aria-checked="true" aria-label="Show parade traffic"></button></div>
+    </div>
+
+    <aside class="chat" aria-label="Group chat">
+      <div class="chat-head">
+        <div class="faces" id="faces"></div>
+        <div><b>Thanksgiving crew</b><span>Thu, Nov 26 · after the parade</span></div>
+      </div>
+      <div class="msgs" id="msgs" aria-live="polite"></div>
+      <div class="composer">
+        <div class="quick">
+          <button type="button" id="q1">Simulate: 1 train delay</button>
+          <button type="button" id="q2">I'm running 15 min late</button>
+          <button type="button" id="q3">Somewhere cheaper?</button>
+        </div>
+        <form class="row" id="form"><input id="input" placeholder="Message the group" autocomplete="off" aria-label="Message"><button class="send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
+      </div>
+    </aside>
+  </section>
+
+  <section class="how">
+    <div class="step"><b>1. Chat</b><span>Friends say where they are, when they're free and what they want, in plain words.</span></div>
+    <div class="step"><b>2. Understand</b><span>An AI reads the chat into each person's start point, time and budget.</span></div>
+    <div class="step"><b>3. Suggest fairly</b><span>Places API finds spots; Route Matrix times every person to every spot. We pick the ones where nobody travels much longer than the rest.</span></div>
+    <div class="step"><b>4. Adapt live</b><span>Parade closures, crowds and train delays change the times. Huddle tells the person affected what to do.</span></div>
+  </section>
+
+  <details>
+    <summary>How it connects to Google Maps</summary>
+    <pre id="api"></pre>
+  </details>
+  <details>
+    <summary>Agent prompt</summary>
+    <pre id="prompt"></pre>
+  </details>
+</div>
+
+<script>
+const ST=s=>760-(s-14)*9.5;
+const P={
+  you:{n:'You',x:600,y:ST(57),lat:40.7556,lng:-73.9556,from:'Cornell Tech',mode:'transit'},
+  riya:{n:'Riya',x:195,y:ST(59),lat:40.7681,lng:-73.9819,from:'Columbus Circle',mode:'transit'},
+  sam:{n:'Sam',x:330,y:770,lat:40.6710,lng:-73.9814,from:'Park Slope',mode:'transit',brooklyn:true},
+  dev:{n:'Dev',x:268,y:ST(35),lat:40.7498,lng:-73.9877,from:'Herald Square',mode:'walk'},
+};
+const PLACES=[
+  {id:'ktown',n:'Jongro BBQ',sub:'Korean BBQ · W 32nd St, Koreatown · ~$28 pp',x:310,y:ST(32),lat:40.7477,lng:-73.9866,price:28},
+  {id:'bryant',n:'Winter Village',sub:'Holiday food stalls · Bryant Park · ~$20 pp',x:312,y:ST(41),lat:40.7536,lng:-73.9832,price:20},
+  {id:'hk',n:'Pure Thai Cookhouse',sub:'Thai noodles · 9th Ave, Hell’s Kitchen · ~$22 pp',x:150,y:ST(51),lat:40.7637,lng:-73.9890,price:22},
+  {id:'chelsea',n:'Los Tacos No. 1',sub:'Tacos · Chelsea Market · ~$15 pp',x:150,y:ST(15.5),lat:40.7424,lng:-74.0061,price:15},
+  {id:'gc',n:'Shake Shack',sub:'Burgers · Grand Central Dining Concourse · ~$18 pp',x:390,y:ST(42),lat:40.7527,lng:-73.9772,price:18},
+  {id:'union',n:'Joe’s Pizza',sub:'Pizza · E 14th St, Union Square · ~$10 pp',x:375,y:ST(14.5),lat:40.7339,lng:-73.9884,price:10},
+];
+let paradeOn=true,picked=null,voted=false,cheap=false,msgs=[];
+
+function trip(pid,pl){
+  const p=P[pid];let from=p.brooklyn?{x:330,y:ST(14)}:p,base=p.brooklyn?18:4;
+  const dx=Math.abs(from.x-pl.x),dy=Math.abs(from.y-pl.y);
+  let m=p.mode==='walk'?Math.round(dx*0.078+dy/9.5):Math.round(base+dx*0.05+dy*0.04);
+  let why=null;
+  if(paradeOn){
+    const inBand=y=>y<=ST(34)&&y>=ST(59);
+    if((from.x<285)!==(pl.x<285)&&(inBand(from.y)||inBand(pl.y))){
+      if(p.mode==='walk'&&inBand(from.y)&&inBand(pl.y)){m+=15;why=p.n+' would have to cross 6th Ave at a marshal checkpoint (+15 min)';}
+      else{m+=4;why=why||null;}
+    }
+    if(Math.hypot(pl.x-268,pl.y-ST(34.5))<30||Math.hypot(pl.x-195,pl.y-ST(59))<30){m+=8;why=why||'Parade crowds around this spot (+8 min)';}
+  }
+  return {m:Math.max(m,3),why};
+}
+function rank(){
+  return PLACES.filter(pl=>!cheap||pl.price<=18).map(pl=>{
+    const t={};let notes=[];for(const k in P){t[k]=trip(k,pl);if(t[k].why)notes.push(t[k].why);}
+    const vals=Object.values(t).map(x=>x.m),max=Math.max(...vals),sum=vals.reduce((a,b)=>a+b,0);
+    return {pl,t,max,sum,notes:[...new Set(notes)]};
+  }).sort((a,b)=>a.max-b.max||a.sum-b.sum);
+}
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const col=k=>`var(--${k})`;
+const av=(k)=>`<span class="av" style="background:${col(k)}">${P[k].n[0]}</span>`;
+const BOT=`<span class="av botav"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>`;
+
+function say(who,text,extra){msgs.push({who,text,extra});}
+function optionsMsg(intro){
+  const r=rank().slice(0,3);picked=r[0].pl.id;
+  say('bot',intro,{type:'options'});
+}
+
+function renderMsgs(){
+  const r=rank(),top=r.slice(0,3);
+  $('msgs').innerHTML=msgs.map((m,i)=>{
+    if(m.who==='bot'){
+      let extra='';
+      if(m.extra&&m.extra.type==='options'&&i===lastOptions()){
+        extra=`<div class="opts">${top.map((o,j)=>`<button class="opt" type="button" data-id="${o.pl.id}" aria-pressed="${picked===o.pl.id}">
+          <div class="r1"><span class="nm">${esc(o.pl.n)}</span><span class="tag">${j===0?'Fairest for everyone':'Longest trip '+o.max+' min'}</span></div>
+          <span class="sub">${esc(o.pl.sub)}</span>
+          <div class="times">${Object.keys(P).map(k=>`<span class="time"><i style="background:${col(k)}"></i>${P[k].n} ${o.t[k].m}m</span>`).join('')}</div>
+          ${o.notes.length?`<span class="warn">${esc(o.notes[0])}</span>`:''}
+        </button>`).join('')}</div>${!voted?`<button class="vote" type="button" id="vote">Vote for ${esc(PLACES.find(p=>p.id===picked).n)}</button>`:''}`;
+      } else if(m.extra&&m.extra.type==='options'){extra=`<div class="sub" style="font-size:12px;color:var(--muted);margin-top:4px">Earlier suggestions, see the latest below.</div>`;}
+      if(m.extra&&m.extra.type==='dirs'){const pl=PLACES.find(p=>p.id===m.extra.id);
+        extra=`<div class="dirs">${Object.keys(P).map(k=>`<a href="https://www.google.com/maps/dir/?api=1&origin=${P[k].lat},${P[k].lng}&destination=${pl.lat},${pl.lng}&travelmode=${P[k].mode==='walk'?'walking':'transit'}" target="_blank" rel="noopener">${P[k].n} ↗</a>`).join('')}</div>`;}
+      if(m.extra&&m.extra.parade) extra=`<div class="parade-note">${esc(m.extra.parade)}</div>`+extra;
+      return `<div class="m bot">${BOT}<div class="body" style="flex:1"><span class="who">Huddle</span><div class="bubble">${esc(m.text)}${extra}</div></div></div>`;
+    }
+    return `<div class="m ${m.who==='you'?'me':''}">${av(m.who)}<div class="body"><span class="who">${P[m.who].n}</span><div class="bubble">${esc(m.text)}</div></div></div>`;
+  }).join('');
+  document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{picked=b.dataset.id;render();});
+  const v=$('vote');if(v)v.onclick=()=>{
+    voted=true;const pl=PLACES.find(p=>p.id===picked);
+    say('you','I vote '+pl.n+' 👍');say('dev','Same, works for me');say('riya','In!');
+    say('bot',`${pl.n} it is, 3 of 4 votes. Here are everyone's directions in Google Maps. I'll keep an eye on the parade and the trains.`,{type:'dirs',id:pl.id});
+    render(true);};
+  const box=$('msgs');box.scrollTop=box.scrollHeight;
+}
+function lastOptions(){for(let i=msgs.length-1;i>=0;i--)if(msgs[i].extra&&msgs[i].extra.type==='options')return i;return -1;}
+
+function renderMap(){
+  const g=[];
+  g.push(`<rect x="-300" y="-300" width="1240" height="1400" fill="var(--land)"/>`);
+  g.push(`<rect x="-300" y="-300" width="340" height="1400" fill="var(--water)"/><rect x="560" y="-300" width="400" height="1400" fill="var(--water)"/>`);
+  g.push(`<rect x="585" y="${ST(84)}" width="30" height="${ST(46)-ST(84)}" rx="14" fill="var(--land)"/>`);
+  g.push(`<rect x="197" y="${ST(110)}" width="131" height="${ST(59)-ST(110)-2}" fill="var(--park)"/>`);
+  for(let s=0;s<=110;s+=2){const big=[14,23,34,42,57,59,72,86].includes(s);g.push(`<line x1="40" x2="560" y1="${ST(s)}" y2="${ST(s)}" stroke="var(--road)" stroke-width="${big?3.5:1.5}"/>`);}
+  [60,105,150,195,240,285,330,360,390,420,455,490,525].forEach(x=>g.push(`<line x1="${x}" x2="${x}" y1="${ST(-10)}" y2="${ST(110)}" stroke="var(--road)" stroke-width="5"/>`));
+  g.push(`<path d="M195 ${ST(59)} L60 ${ST(100)}" stroke="var(--road)" stroke-width="4"/><path d="M195 ${ST(59)} L380 ${ST(10)}" stroke="var(--road)" stroke-width="4"/>`);
+  g.push(`<text x="262" y="${ST(72)}" font-size="12" fill="var(--muted)" text-anchor="middle" font-weight="600">Central Park</text>`);
+  if(paradeOn){
+    g.push(`<path d="M195 ${ST(77)} L195 ${ST(59)} L285 ${ST(59)} L285 ${ST(34)} L262 ${ST(34)}" stroke="var(--crit)" stroke-width="20" fill="none" stroke-opacity=".14" stroke-linejoin="round"/>`);
+    g.push(`<path d="M195 ${ST(77)} L195 ${ST(59)} L285 ${ST(59)} L285 ${ST(34)} L262 ${ST(34)}" stroke="var(--parade)" stroke-width="5" fill="none" stroke-dasharray="9 6" stroke-linejoin="round" stroke-linecap="round"/>`);
+    g.push(`<rect x="292" y="${ST(50)}" width="98" height="20" rx="10" fill="var(--parade-soft)"/><text x="341" y="${ST(50)+14}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">Parade · 6th Ave</text>`);
+  }
+  const top=rank().slice(0,3),sel=PLACES.find(p=>p.id===picked)||top[0].pl;
+  for(const k in P){const p=P[k],from=p.brooklyn?{x:330,y:ST(12)}:p;
+    g.push(`<path d="M${from.x} ${from.y} L${sel.x} ${from.y} L${sel.x} ${sel.y}" stroke="${col(k)}" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round" ${p.mode==='walk'?'stroke-dasharray="1 7"':''} opacity=".9"/>`);}
+  for(const o of top){const pl=o.pl,on=pl.id===sel.id;
+    g.push(`<g transform="translate(${pl.x} ${pl.y})"><path d="M0 0 C-11 -13 -11 -27 0 -27 C11 -27 11 -13 0 0Z" fill="${on?'var(--brand)':'var(--surface)'}" stroke="${on?'var(--surface)':'var(--brand)'}" stroke-width="2"/><circle cy="-17" r="3.5" fill="${on?'var(--surface)':'var(--brand)'}"/></g>`);
+    const w=pl.n.length*6.8+18;g.push(`<rect x="${pl.x+12}" y="${pl.y-32}" width="${w}" height="20" rx="10" fill="var(--surface)"/><text x="${pl.x+20}" y="${pl.y-18}" font-size="11.5" font-weight="700" fill="${on?'var(--brand)':'var(--ink)'}">${esc(pl.n)}</text>`);}
+  for(const k in P){const p=P[k],y=p.brooklyn?Math.min(p.y,ST(12)):p.y;
+    g.push(`<g transform="translate(${p.x} ${y})"><circle r="12" fill="${col(k)}" stroke="var(--surface)" stroke-width="3"/><text y="4" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${p.n[0]}</text></g>`);
+    if(p.brooklyn) g.push(`<text x="${p.x+16}" y="${y+4}" font-size="10.5" fill="var(--muted)" font-weight="600">from Brooklyn</text>`);}
+  $('map').innerHTML=g.join('');
+}
+
+function render(){renderMsgs();renderMap();$('parade').setAttribute('aria-checked',String(paradeOn));}
+
+$('faces').innerHTML=['you','riya','sam','dev'].map(av).join('');
+$('parade').onclick=()=>{
+  paradeOn=!paradeOn;const best=rank()[0].pl;
+  optionsMsg(paradeOn?`Parade traffic is back on. Updated picks:`:`Without parade traffic, here's what a normal day looks like. (Not realistic today.)`);
+  if(paradeOn) msgs[msgs.length-1].extra.parade='6th Ave is closed 59th → 34th until about 1:30 PM. I avoided spots that make anyone cross it on foot.';
+  voted=false;render();
+};
+$('q1').onclick=()=>{say('bot','Heads up, Riya: the 1 train is delayed near Columbus Circle. Take the A/C/D from 59 St instead. You’ll still arrive within 2 minutes of the plan.',{parade:'Live MTA alert · 12:20 PM'});render();};
+$('q2').onclick=()=>{say('you','Running 15 min late, sorry!');say('bot','No problem. I told the group and pushed the plan to 1:15 PM. Everyone else can leave 15 minutes later too.');render();};
+$('q3').onclick=()=>{say('you','Somewhere cheaper?');cheap=true;voted=false;optionsMsg('Here are spots around $18 or less, still fair for everyone:');render();};
+$('form').onsubmit=e=>{e.preventDefault();const v=$('input').value.trim();if(!v)return;$('input').value='';say('you',v);
+  if(/late/i.test(v)) say('bot','Got it. I’ll let everyone know and shift the time.');
+  else if(/cheap|budget|\$/i.test(v)){cheap=true;voted=false;optionsMsg('Filtered for cheaper spots:');}
+  else say('bot','Noted. The current suggestions still work best for everyone.');
+  render();};
+
+// opening conversation
+say('you','Lunch after the parade? I’m at Cornell Tech');
+say('riya','Watching from Columbus Circle, free after 12');
+say('sam','Coming from Park Slope. Under $30 please');
+say('dev','I’m near Herald Square, don’t want to walk far');
+optionsMsg('Got it: 4 people, after 12, under $30 each, short walk for Dev. Here are the fairest restaurants (sample picks; live version pulls names, prices and Thanksgiving hours from Google Places):');
+msgs[msgs.length-1].extra.parade='The parade closes 6th Ave (59th → 34th) until about 1:30 PM. I avoided spots that make Dev cross it on foot.';
+
+$('api').textContent=`1. Places API (New) — find candidate spots that match the chat
+POST https://places.googleapis.com/v1/places:searchText
+{ "textQuery": "lunch under $30 near Midtown Manhattan", "openNow": true }
+
+2. Route Matrix API — every friend to every spot in one call
+POST https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix
+{
+  "origins": [ You, Riya, Sam, Dev as latLng ],
+  "destinations": [ candidate places as latLng ],
+  "travelMode": "TRANSIT",
+  "departureTime": "2026-11-26T17:00:00Z"
+}
+
+3. Huddle adds parade closures, crowds and live MTA alerts to those times,
+   then ranks places by the longest trip (fairness), then total time.
+
+4. "Directions ↗" opens each person's route in Google Maps.`;
+$('prompt').textContent=`You are Huddle, a group-planning assistant that lives in a chat on top of Google Maps.
+
+GOAL
+Help a group of friends agree on where to meet, fairly and quickly, and keep the plan working as conditions change.
+
+FROM THE CHAT, EXTRACT
+For each person: start location, when they're free, budget, food or activity preferences, and limits (e.g. doesn't want to walk far).
+
+TOOLS
+- search_places(query, area, filters): candidate spots (Google Places API).
+- route_matrix(origins, destinations, mode, time): every person's travel time to every spot (Google Route Matrix API).
+- get_disruptions(time): parade closures, crowds, MTA alerts.
+- post_poll(options) and send_directions(person, place).
+
+HOW TO SUGGEST
+1. Find 5–10 candidates that match everyone's constraints.
+2. Adjust travel times for closures and crowds. Never send someone on foot across a closed parade route if another option exists.
+3. Rank by the longest single trip first (fairness), then total time.
+4. Post the top 3 with each person's time and one-line reason. Let the group vote.
+
+AFTER THE VOTE
+Send each person directions. If a delay or closure affects someone, message only that person with what to do and the new arrival time.
+
+RULES
+Keep messages short and friendly. Never book or pay without approval. Say when information is uncertain.`;
+render();
+</script>
+
+</body>
+</html>
